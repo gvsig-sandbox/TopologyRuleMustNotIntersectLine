@@ -13,7 +13,8 @@ from org.gvsig.topology.lib.api import TopologyLocator
 from org.gvsig.topology.lib.spi import AbstractTopologyRule
 
 from deleteLineAction import DeleteLineAction
-# from markLineAction import MarkLineAction
+from markLineAction import MarkLineAction
+from markPointAction import MarkPointAction
 
 class MustNotIntersectLineRule(AbstractTopologyRule):
     
@@ -24,19 +25,16 @@ class MustNotIntersectLineRule(AbstractTopologyRule):
     def __init__(self, plan, factory, tolerance, dataSet1):
         AbstractTopologyRule.__init__(self, plan, factory, tolerance, dataSet1, dataSet1)
         self.addAction(DeleteLineAction())
-        # self.addAction(MarkLineAction())
+        self.addAction(MarkLineAction())
+        self.addAction(MarkPointAction())
     
-    def intersects(self, line1, theDataSet2, tolerance1):
-        result = [False, []]
-        if tolerance1 > 0:
-            buffer1 = line1.buffer(tolerance1)
-        else:
-            buffer1 = line1
+    def intersects(self, line1, theDataSet2):
+        result= [False, []]
         if theDataSet2.getSpatialIndex() != None:
-            for featureReference in theDataSet2.query(buffer1):
+            for featureReference in theDataSet2.query(line1):
                 feature2 = featureReference.getFeature()
                 line2 = feature2.getDefaultGeometry()
-                if not line1.equals(line2) and buffer1.intersects(line2):
+                if not line1.equals(line2) and line1.intersects(line2):
                     result[0] = True
         else:
             if self.expression == None:
@@ -58,21 +56,19 @@ class MustNotIntersectLineRule(AbstractTopologyRule):
                     )
                 ).toString()
             )
-            features2 = theDataSet2.findAll(self.expression)
+            features2 = theDataSet2.findFirst(self.expression)
             for feature2 in features2:
                 result[0] = True
-                result[1].append(feature2)
         return result
     
     def check(self, taskStatus, report, feature1):
         try:
             line1 = feature1.getDefaultGeometry()
-            tolerance1 = self.getTolerance()
             theDataSet2 = self.getDataSet1()
             geometryType1 = line1.getGeometryType()
             if geometryType1.getSubType() == geom.D2 or geometryType1.getSubType() == geom.D2M:
                 if geometryType1.getType() == geom.LINE or geometryType1.isTypeOf(geom.LINE):
-                    result = self.intersects(line1, theDataSet2, tolerance1)
+                    result = self.intersects(line1, theDataSet2)
                     if result[0]:
                         report.addLine(self,
                             self.getDataSet1(),
@@ -91,7 +87,7 @@ class MustNotIntersectLineRule(AbstractTopologyRule):
                     if geometryType1.getType() == geom.MULTILINE or geometryType1.isTypeOf(geom.MULTILINE):
                         n1 = line1.getPrimitivesNumber()
                         for i in range(0, n1 + 1):
-                            result = self.intersects(line1.getCurveAt(i), theDataSet2, tolerance1)
+                            result = self.intersects(line1.getCurveAt(i), theDataSet2)
                             if result[0]:
                                 report.addLine(self,
                                     self.getDataSet1(),
